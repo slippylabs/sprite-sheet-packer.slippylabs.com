@@ -1,0 +1,987 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sprite Sheet Packer // sprite-sheet-packer.slippylabs.com</title>
+<meta name="description" content="Pack sprite frames into a texture atlas — MaxRects packing, automatic transparent-border trimming, padding and extrude — and export the PNG with a Phaser, Godot, TexturePacker or CSS atlas, plus an animated GIF. Runs entirely in your browser.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://sprite-sheet-packer.slippylabs.com/">
+<meta property="og:title" content="Sprite Sheet Packer // sprite-sheet-packer.slippylabs.com">
+<meta property="og:description" content="Pack sprite frames into a texture atlas — MaxRects packing, automatic transparent-border trimming, padding and extrude — and export the PNG with a Phaser, Godot, TexturePacker or CSS atlas, plus an animated GIF. Runs entirely in your browser.">
+<meta property="og:image" content="https://sprite-sheet-packer.slippylabs.com/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Sprite Sheet Packer // sprite-sheet-packer.slippylabs.com">
+<meta name="twitter:description" content="Pack sprite frames into a texture atlas — MaxRects packing, automatic transparent-border trimming, padding and extrude — and export the PNG with a Phaser, Godot, TexturePacker or CSS atlas, plus an animated GIF. Runs entirely in your browser.">
+<meta name="twitter:image" content="https://sprite-sheet-packer.slippylabs.com/og-image.png">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Ccircle%20cx%3D%2232%22%20cy%3D%2234%22%20r%3D%2222%22%20fill%3D%22%231c8a52%22%20stroke%3D%22%2339ff8f%22%20stroke-width%3D%222%22%2F%3E%3Ccircle%20cx%3D%2220%22%20cy%3D%2216%22%20r%3D%228%22%20fill%3D%22%231c8a52%22%20stroke%3D%22%2339ff8f%22%20stroke-width%3D%222%22%2F%3E%3Ccircle%20cx%3D%2244%22%20cy%3D%2216%22%20r%3D%228%22%20fill%3D%22%231c8a52%22%20stroke%3D%22%2339ff8f%22%20stroke-width%3D%222%22%2F%3E%3C%2Fsvg%3E">
+<meta name="theme-color" content="#050b10">
+<link rel="stylesheet" href="style.css?v=1">
+<script>/* perf-lite: drop blend/blur effects on low-power devices. ?fx=lite or ?fx=full to override (persisted). */
+(function(){try{var k="slippy-fx",m=location.search.match(/[?&]fx=(lite|full)/),v=m?m[1]:localStorage.getItem(k);if(m)localStorage.setItem(k,v);if(v==="lite"||(v!=="full"&&(navigator.hardwareConcurrency||8)<=2))document.documentElement.classList.add("perf-lite");}catch(e){}})();</script>
+</head>
+<body>
+
+<div class="starfield"></div>
+<div class="scanlines"></div>
+
+<main class="page-wrap">
+  <div class="hud-panel wide">
+    <div class="corner tl"></div>
+    <div class="corner tr"></div>
+    <div class="corner bl"></div>
+    <div class="corner br"></div>
+
+    <div class="callsign-row">
+      <div class="toad-avatar-wrap">
+        <svg class="toad-avatar" width="46" height="46" viewBox="0 0 64 64">
+          <circle cx="32" cy="34" r="22" fill="#1c8a52" stroke="#39ff8f" stroke-width="2"/>
+          <circle cx="20" cy="16" r="8" fill="#1c8a52" stroke="#39ff8f" stroke-width="2"/>
+          <circle cx="44" cy="16" r="8" fill="#1c8a52" stroke="#39ff8f" stroke-width="2"/>
+          <circle cx="20" cy="16" r="3.5" fill="#050b10"/>
+          <circle cx="44" cy="16" r="3.5" fill="#050b10"/>
+          <ellipse cx="24" cy="32" rx="4.5" ry="5.5" fill="#050b10"/>
+          <ellipse cx="40" cy="32" rx="4.5" ry="5.5" fill="#050b10"/>
+          <circle cx="24" cy="30" r="1.4" fill="#39ff8f"/>
+          <circle cx="40" cy="30" r="1.4" fill="#39ff8f"/>
+          <path d="M22 42 Q32 48 42 42" stroke="#050b10" stroke-width="2" fill="none" stroke-linecap="round"/>
+        </svg>
+        <div class="lock-reticle"></div>
+      </div>
+      <span class="callsign">Workshop Division // Tool</span>
+      <div class="nav-links">
+        <a href="https://projects.slippylabs.com/" class="logout-link">← Archive</a>
+      </div>
+    </div>
+
+
+    <h1>SPRITE SHEET PACKER</h1>
+    <p class="subtitle">Drop your frames in, or cut up a sheet you already have. This packs them tightly, trims the empty space around each one without moving where it draws, and hands you the atlas plus the JSON your engine wants.</p>
+
+    <div class="filter-bar" id="source-bar">
+      <button class="hud-tab active" data-source="files">Drop frames</button>
+      <button class="hud-tab" data-source="slice">Slice a sheet</button>
+      <button class="hud-tab" data-source="demo">Demo frames</button>
+    </div>
+
+    <div id="files-panel">
+      <div class="ssp-drop" id="drop-zone">
+        <p>Drop PNG frames here, or</p>
+        <label class="tool-btn ssp-file-label" for="file-input">Choose files</label>
+        <input class="tool-file-input ssp-hidden-file" id="file-input" type="file" accept="image/*" multiple>
+        <p class="tool-note">Frames are ordered by filename, so <code>run_01.png</code> … <code>run_08.png</code> comes out in the right order.</p>
+      </div>
+    </div>
+
+    <div id="slice-panel" class="hidden">
+      <div class="tool-field-row">
+        <label class="tool-field-label" for="sheet-input">Existing sheet</label>
+        <input class="tool-file-input" id="sheet-input" type="file" accept="image/*">
+      </div>
+      <div class="two-col">
+        <div class="tool-field-row">
+          <label class="tool-field-label" for="cell-w">Cell width (px)</label>
+          <input class="tool-number-input" id="cell-w" type="number" value="32" min="1" step="1">
+        </div>
+        <div class="tool-field-row">
+          <label class="tool-field-label" for="cell-h">Cell height (px)</label>
+          <input class="tool-number-input" id="cell-h" type="number" value="32" min="1" step="1">
+        </div>
+      </div>
+      <p class="tool-note" id="slice-note">Cells are read left to right, top to bottom. Fully transparent cells are skipped.</p>
+    </div>
+
+    <div class="ssp-options">
+      <div class="tool-field-row">
+        <label class="tool-field-label" for="pad-slider">Padding — <span id="pad-value">2</span> px</label>
+        <div class="tool-slider-row"><input type="range" id="pad-slider" min="0" max="16" step="1" value="2"></div>
+      </div>
+      <div class="tool-field-row">
+        <label class="tool-field-label" for="extrude-slider">Extrude — <span id="extrude-value">0</span> px</label>
+        <div class="tool-slider-row"><input type="range" id="extrude-slider" min="0" max="8" step="1" value="0"></div>
+      </div>
+      <div class="tool-checks">
+        <label class="tool-check"><input type="checkbox" id="trim-check" checked> Trim transparent borders</label>
+        <label class="tool-check"><input type="checkbox" id="pot-check"> Power-of-two atlas</label>
+        <label class="tool-check"><input type="checkbox" id="square-check"> Force square</label>
+      </div>
+    </div>
+
+    <div class="ssp-layout">
+      <div class="ssp-atlas-wrap">
+        <canvas id="atlas" width="512" height="512"></canvas>
+        <p class="tool-note" id="atlas-note">Hover a frame to see its rectangle.</p>
+      </div>
+      <div>
+        <div class="net-grid">
+          <div class="net-tile"><div class="net-tile-label">Frames</div><div class="net-tile-value" id="stat-frames">0</div></div>
+          <div class="net-tile"><div class="net-tile-label">Atlas</div><div class="net-tile-value" id="stat-size">—</div></div>
+          <div class="net-tile"><div class="net-tile-label">Used</div><div class="net-tile-value" id="stat-fill">—</div></div>
+          <div class="net-tile"><div class="net-tile-label">Saved by trim</div><div class="net-tile-value" id="stat-trim">—</div></div>
+        </div>
+
+        <h2 class="ssp-h2">Animation</h2>
+        <div class="ssp-preview-wrap">
+          <canvas id="preview" width="220" height="220"></canvas>
+        </div>
+        <div class="tool-field-row">
+          <label class="tool-field-label" for="fps-slider">Frame rate — <span id="fps-value">12</span> fps</label>
+          <div class="tool-slider-row"><input type="range" id="fps-slider" min="1" max="60" step="1" value="12"></div>
+        </div>
+        <div class="tool-controls">
+          <button class="tool-btn" id="playpause-btn" aria-pressed="true">Pause</button>
+          <button class="tool-btn ghost" id="bg-btn">Background: checker</button>
+        </div>
+      </div>
+    </div>
+
+    <h2 class="ssp-h2">Export</h2>
+    <div class="tool-field-row">
+      <label class="tool-field-label" for="format-select">Atlas format</label>
+      <select class="tool-select" id="format-select">
+        <option value="phaser" selected>Phaser 3 / TexturePacker JSON (hash)</option>
+        <option value="array">TexturePacker JSON (array)</option>
+        <option value="godot">Godot 4 — AtlasTexture regions</option>
+        <option value="css">CSS sprite classes</option>
+        <option value="plain">Plain JSON</option>
+      </select>
+    </div>
+    <pre class="tool-output ssp-code" id="atlas-json"></pre>
+    <div class="tool-controls">
+      <button class="tool-btn" id="png-btn">Download atlas PNG</button>
+      <button class="tool-btn ghost" id="json-btn">Download atlas data</button>
+      <button class="tool-btn ghost" id="gif-btn">Download animated GIF</button>
+      <button class="tool-btn ghost" id="copy-btn">Copy data</button>
+      <a id="download-link" hidden></a>
+    </div>
+    <div class="copy-toast" id="toast">Copied</div>
+    <p class="tool-note" id="gif-status" role="status"></p>
+
+    <!-- The GIF89a encoder from video-to-gif.slippylabs.com, unchanged: a
+         hand-written median-cut quantiser plus LZW, verified against
+         ImageMagick as an independent decoder. -->
+    <script src="lib/gif-encoder.js?v=1"></script>
+    <div class="comm-window">
+      <div class="comm-portrait">
+        <svg width="36" height="36" viewBox="0 0 64 64">
+          <circle cx="32" cy="34" r="22" fill="#1c8a52" stroke="#39ff8f" stroke-width="2"/>
+          <circle cx="20" cy="16" r="8" fill="#1c8a52" stroke="#39ff8f" stroke-width="2"/>
+          <circle cx="44" cy="16" r="8" fill="#1c8a52" stroke="#39ff8f" stroke-width="2"/>
+          <circle cx="20" cy="16" r="3.5" fill="#050b10"/>
+          <circle cx="44" cy="16" r="3.5" fill="#050b10"/>
+          <ellipse cx="24" cy="32" rx="4.5" ry="5.5" fill="#050b10"/>
+          <ellipse cx="40" cy="32" rx="4.5" ry="5.5" fill="#050b10"/>
+          <circle cx="24" cy="30" r="1.4" fill="#39ff8f"/>
+          <circle cx="40" cy="30" r="1.4" fill="#39ff8f"/>
+          <path d="M22 42 Q32 48 42 42" stroke="#050b10" stroke-width="2" fill="none" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="comm-body">
+        <div class="comm-label"><span class="dot"></span> Incoming Transmission &mdash; Slippy</div>
+        <p>&quot;Trimming is free memory. Trimming without recording the offset is a sprite that walks sideways.&quot;</p>
+      </div>
+    </div>
+
+    <a href="https://projects.slippylabs.com/" class="hud-btn">← Back to Archive</a>
+  </div>
+</main>
+
+
+<script>
+/* ---- Packing ----------------------------------------------------------------
+   MaxRects, best-short-side-fit. The idea is to keep an explicit list of
+   maximal free rectangles rather than a tree: place a sprite in the free rect
+   whose leftover short side is smallest, then split every free rect the
+   placement overlaps and throw away the ones contained in another. It beats
+   shelf and guillotine packers on sprite sets, which are exactly the awkward
+   mix of sizes those two handle worst.
+
+   No rotation. A rotated frame packs better and then every consumer has to
+   honour a "rotated" flag that half of them ignore -- so the atlas here is
+   always drawn the way up you gave it. */
+
+function rectsIntersect(a, b) {
+  return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+}
+
+function rectContains(outer, inner) {
+  return inner.x >= outer.x && inner.y >= outer.y
+    && inner.x + inner.w <= outer.x + outer.w
+    && inner.y + inner.h <= outer.y + outer.h;
+}
+
+function splitFreeRect(free, used) {
+  /* Returns the (up to four) maximal rectangles left when `used` is stamped out
+     of `free`. They overlap each other -- that is what "maximal" means here and
+     it is the whole point of MaxRects. */
+  if (!rectsIntersect(free, used)) return [free];
+  const out = [];
+  if (used.x > free.x) out.push({ x: free.x, y: free.y, w: used.x - free.x, h: free.h });
+  if (used.x + used.w < free.x + free.w) {
+    out.push({ x: used.x + used.w, y: free.y, w: free.x + free.w - (used.x + used.w), h: free.h });
+  }
+  if (used.y > free.y) out.push({ x: free.x, y: free.y, w: free.w, h: used.y - free.y });
+  if (used.y + used.h < free.y + free.h) {
+    out.push({ x: free.x, y: used.y + used.h, w: free.w, h: free.y + free.h - (used.y + used.h) });
+  }
+  return out.filter((r) => r.w > 0 && r.h > 0);
+}
+
+function pruneFreeList(list) {
+  const out = [];
+  for (let i = 0; i < list.length; i++) {
+    let contained = false;
+    for (let j = 0; j < list.length; j++) {
+      if (i === j) continue;
+      if (rectContains(list[j], list[i])) {
+        /* Identical rectangles contain each other; keep exactly one by letting
+           only the later index lose. Without this tie-break the prune can empty
+           the list of a duplicated free rect entirely. */
+        if (!rectContains(list[i], list[j]) || j < i) { contained = true; break; }
+      }
+    }
+    if (!contained) out.push(list[i]);
+  }
+  return out;
+}
+
+function packIntoBin(rects, binWidth, binHeight) {
+  let free = [{ x: 0, y: 0, w: binWidth, h: binHeight }];
+  const placements = [];
+  /* Tallest first. Sorting by area is the common choice and is measurably worse
+     for sprite sheets, where a few tall frames decide the bin height. */
+  const order = rects.slice().sort((a, b) => (b.h - a.h) || (b.w - a.w) || (a.id < b.id ? -1 : 1));
+  for (const rect of order) {
+    let best = null;
+    let bestShort = Infinity;
+    let bestLong = Infinity;
+    for (const f of free) {
+      if (f.w < rect.w || f.h < rect.h) continue;
+      const leftoverW = f.w - rect.w;
+      const leftoverH = f.h - rect.h;
+      const shortSide = Math.min(leftoverW, leftoverH);
+      const longSide = Math.max(leftoverW, leftoverH);
+      if (shortSide < bestShort || (shortSide === bestShort && longSide < bestLong)) {
+        bestShort = shortSide;
+        bestLong = longSide;
+        best = { x: f.x, y: f.y };
+      }
+    }
+    if (!best) return null;
+    const used = { x: best.x, y: best.y, w: rect.w, h: rect.h };
+    placements.push({ id: rect.id, ...used });
+    const next = [];
+    for (const f of free) next.push(...splitFreeRect(f, used));
+    free = pruneFreeList(next);
+  }
+  return placements;
+}
+
+function nextPowerOfTwo(n) {
+  let p = 1;
+  while (p < n) p *= 2;
+  return p;
+}
+
+/* Try candidate bin sizes smallest-first and keep the first that fits. The
+   candidates come from the total area, because a bin smaller than the sum of
+   the sprites cannot possibly work and there is no point trying one. */
+function packRects(rects, options = {}) {
+  const powerOfTwo = !!options.powerOfTwo;
+  const square = !!options.square;
+  const maxSize = options.maxSize || 8192;
+  if (!rects.length) return { width: 0, height: 0, placements: [], area: 0, used: 0 };
+
+  let area = 0;
+  let minW = 0;
+  let minH = 0;
+  for (const r of rects) {
+    area += r.w * r.h;
+    minW = Math.max(minW, r.w);
+    minH = Math.max(minH, r.h);
+  }
+
+  const candidates = [];
+  const start = Math.max(minW, minH, Math.ceil(Math.sqrt(area)));
+  if (powerOfTwo) {
+    for (let s = nextPowerOfTwo(start); s <= maxSize; s *= 2) {
+      candidates.push({ w: s, h: s });
+      if (!square) candidates.push({ w: s * 2, h: s });
+    }
+  } else {
+    for (let s = start; s <= maxSize; s = Math.ceil(s * 1.08) + 1) {
+      candidates.push({ w: s, h: s });
+      if (!square) {
+        candidates.push({ w: Math.ceil(s * 1.35), h: Math.max(minH, Math.ceil(s * 0.78)) });
+        candidates.push({ w: Math.max(minW, Math.ceil(s * 0.78)), h: Math.ceil(s * 1.35) });
+      }
+    }
+  }
+  candidates.sort((a, b) => (a.w * a.h) - (b.w * b.h));
+
+  for (const c of candidates) {
+    if (c.w < minW || c.h < minH) continue;
+    const placements = packIntoBin(rects, c.w, c.h);
+    if (placements) {
+      /* Shrink-wrap: the chosen candidate is usually taller than it needed to
+         be, and a shorter texture is a smaller upload. */
+      let usedW = 0;
+      let usedH = 0;
+      for (const p of placements) {
+        usedW = Math.max(usedW, p.x + p.w);
+        usedH = Math.max(usedH, p.y + p.h);
+      }
+      const width = powerOfTwo ? nextPowerOfTwo(usedW) : usedW;
+      const height = powerOfTwo ? nextPowerOfTwo(usedH) : usedH;
+      const finalW = square ? Math.max(width, height) : width;
+      const finalH = square ? Math.max(width, height) : height;
+      return { width: finalW, height: finalH, placements, area, used: area / (finalW * finalH) };
+    }
+  }
+  return null;
+}
+
+/* ---- Trimming ---------------------------------------------------------------
+   The tight box around the non-transparent pixels. The offsets have to survive
+   into the atlas data, or every trimmed sprite draws shifted by however much
+   empty space happened to be around it -- which is the single most common way
+   a packed sheet goes wrong, because it looks fine frame by frame and only
+   shows up as a walk cycle that slides. */
+function trimBounds(pixels, width, height, alphaThreshold = 0) {
+  let minX = width;
+  let minY = height;
+  let maxX = -1;
+  let maxY = -1;
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      if (pixels[(y * width + x) * 4 + 3] > alphaThreshold) {
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+      }
+    }
+  }
+  /* A fully transparent frame has no box. Returning a 1x1 rather than a 0x0
+     keeps it in the atlas and keeps the frame indices lined up with the
+     animation -- dropping it silently would shorten the walk cycle. */
+  if (maxX < 0) return { x: 0, y: 0, w: 1, h: 1, empty: true };
+  return { x: minX, y: minY, w: maxX - minX + 1, h: maxY - minY + 1, empty: false };
+}
+
+/* ---- Frames ------------------------------------------------------------------
+   A frame knows three rectangles: where it lives in the atlas, how big it was
+   before trimming, and where the trimmed part sits inside that. Every export
+   format below is a rearrangement of those. */
+function buildFrames(sources, options = {}) {
+  const padding = Math.max(0, options.padding || 0);
+  const extrude = Math.max(0, options.extrude || 0);
+  const trim = options.trim !== false;
+
+  const rects = sources.map((s) => {
+    const bounds = trim && s.pixels
+      ? trimBounds(s.pixels, s.width, s.height, options.alphaThreshold || 0)
+      : { x: 0, y: 0, w: s.width, h: s.height, empty: false };
+    return {
+      id: s.name,
+      source: s,
+      bounds,
+      /* Padding separates frames so a filtered sample cannot bleed across;
+         extrude repeats the edge pixel outward so a sample that lands just
+         past the edge still finds the sprite's own colour. They solve the two
+         halves of the same problem and a tile map needs both. */
+      w: bounds.w + padding * 2 + extrude * 2,
+      h: bounds.h + padding * 2 + extrude * 2,
+    };
+  });
+
+  const packed = packRects(rects.map((r) => ({ id: r.id, w: r.w, h: r.h })), options);
+  if (!packed) return null;
+
+  const byId = new Map(packed.placements.map((p) => [p.id, p]));
+  const frames = rects.map((r) => {
+    const p = byId.get(r.id);
+    const inset = padding + extrude;
+    return {
+      name: r.id,
+      source: r.source,
+      /* The rect the engine samples: inside the padding and the extrude. */
+      frame: { x: p.x + inset, y: p.y + inset, w: r.bounds.w, h: r.bounds.h },
+      /* The block reserved in the atlas, including padding and extrude. */
+      block: { x: p.x, y: p.y, w: r.w, h: r.h },
+      trimmed: r.bounds.w !== r.source.width || r.bounds.h !== r.source.height,
+      spriteSourceSize: { x: r.bounds.x, y: r.bounds.y, w: r.bounds.w, h: r.bounds.h },
+      sourceSize: { w: r.source.width, h: r.source.height },
+      extrude,
+      empty: r.bounds.empty,
+    };
+  });
+  return { frames, width: packed.width, height: packed.height, used: packed.used, area: packed.area };
+}
+
+/* ---- Atlas data -------------------------------------------------------------- */
+
+function atlasData(atlas, format, imageName) {
+  const frames = atlas.frames;
+  const meta = {
+    app: 'sprite-sheet-packer.slippylabs.com',
+    image: imageName,
+    format: 'RGBA8888',
+    size: { w: atlas.width, h: atlas.height },
+    scale: '1',
+  };
+  if (format === 'array') {
+    return JSON.stringify({
+      frames: frames.map((f) => ({
+        filename: f.name,
+        frame: f.frame,
+        rotated: false,
+        trimmed: f.trimmed,
+        spriteSourceSize: f.spriteSourceSize,
+        sourceSize: f.sourceSize,
+      })),
+      meta,
+    }, null, 2);
+  }
+  if (format === 'godot') {
+    /* Godot has no atlas manifest format of its own -- an AtlasTexture is a
+       resource per region. This emits one .tres per frame, concatenated, which
+       is what you would otherwise write by hand. */
+    return frames.map((f) => `[gd_resource type="AtlasTexture" format=3]
+
+[ext_resource type="Texture2D" path="res://${imageName}" id="1"]
+
+[resource]
+atlas = ExtResource("1")
+region = Rect2(${f.frame.x}, ${f.frame.y}, ${f.frame.w}, ${f.frame.h})
+margin = Rect2(${f.spriteSourceSize.x}, ${f.spriteSourceSize.y}, ${f.sourceSize.w - f.frame.w}, ${f.sourceSize.h - f.frame.h})
+; save as ${f.name.replace(/\.[^.]+$/, '')}.tres`).join('\n\n');
+  }
+  if (format === 'css') {
+    const safe = (n) => n.replace(/\.[^.]+$/, '').replace(/[^a-zA-Z0-9_-]/g, '-');
+    return `.sprite {
+  background-image: url("${imageName}");
+  background-repeat: no-repeat;
+  display: inline-block;
+}
+${frames.map((f) => `.sprite--${safe(f.name)} {
+  width: ${f.sourceSize.w}px;
+  height: ${f.sourceSize.h}px;
+  /* the trim offset is folded into the position, so the box stays the original size */
+  background-position: ${-(f.frame.x - f.spriteSourceSize.x)}px ${-(f.frame.y - f.spriteSourceSize.y)}px;
+}`).join('\n')}`;
+  }
+  if (format === 'plain') {
+    return JSON.stringify({
+      image: imageName,
+      width: atlas.width,
+      height: atlas.height,
+      frames: frames.map((f) => ({
+        name: f.name,
+        x: f.frame.x, y: f.frame.y, w: f.frame.w, h: f.frame.h,
+        offsetX: f.spriteSourceSize.x, offsetY: f.spriteSourceSize.y,
+        sourceW: f.sourceSize.w, sourceH: f.sourceSize.h,
+      })),
+    }, null, 2);
+  }
+  const hash = {};
+  for (const f of frames) {
+    hash[f.name] = {
+      frame: f.frame,
+      rotated: false,
+      trimmed: f.trimmed,
+      spriteSourceSize: f.spriteSourceSize,
+      sourceSize: f.sourceSize,
+    };
+  }
+  return JSON.stringify({ frames: hash, meta }, null, 2);
+}
+
+/* ---- A synthetic frame set, used for the demo and for testing ---------------
+   Deterministic, so the demo looks the same every time and a test can assert
+   exact pixels. */
+function demoFrames(count = 8, size = 48) {
+  const out = [];
+  for (let i = 0; i < count; i++) {
+    const pixels = new Uint8ClampedArray(size * size * 4);
+    const t = i / count;
+    const cx = size / 2 + Math.cos(t * Math.PI * 2) * 7;
+    const cy = size / 2 + Math.sin(t * Math.PI * 2) * 5;
+    const r = 9 + Math.sin(t * Math.PI * 2) * 3;
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const d = Math.hypot(x + 0.5 - cx, y + 0.5 - cy);
+        const idx = (y * size + x) * 4;
+        if (d <= r) {
+          pixels[idx] = Math.round(40 + 200 * (1 - d / r));
+          pixels[idx + 1] = Math.round(255 - 120 * t);
+          pixels[idx + 2] = Math.round(120 + 100 * Math.sin(t * Math.PI * 2));
+          pixels[idx + 3] = 255;
+        }
+      }
+    }
+    /* A couple of frames get a tail, so the frames are different sizes after
+       trimming -- a packer tested only on equal squares is not tested. */
+    if (i % 3 === 0) {
+      for (let x = 2; x < size - 2; x++) {
+        const y = Math.round(size - 6 + Math.sin(x * 0.4) * 2);
+        const idx = (y * size + x) * 4;
+        pixels[idx] = 255; pixels[idx + 1] = 145; pixels[idx + 2] = 48; pixels[idx + 3] = 255;
+      }
+    }
+    out.push({ name: `frame_${String(i + 1).padStart(2, '0')}.png`, width: size, height: size, pixels });
+  }
+  return out;
+}
+
+/* Draw the packed atlas into a flat RGBA buffer, exactly as the canvas path
+   does. Having this as a pure function is what lets the packing be checked
+   without a browser: pack, blit, then read every frame back out through the
+   exported rectangles and compare with the source. */
+function blitAtlas(atlas) {
+  const buf = new Uint8ClampedArray(atlas.width * atlas.height * 4);
+  for (const f of atlas.frames) {
+    const src = f.source;
+    for (let y = 0; y < f.frame.h; y++) {
+      for (let x = 0; x < f.frame.w; x++) {
+        const sx = f.spriteSourceSize.x + x;
+        const sy = f.spriteSourceSize.y + y;
+        const si = (sy * src.width + sx) * 4;
+        const di = ((f.frame.y + y) * atlas.width + (f.frame.x + x)) * 4;
+        buf[di] = src.pixels[si];
+        buf[di + 1] = src.pixels[si + 1];
+        buf[di + 2] = src.pixels[si + 2];
+        buf[di + 3] = src.pixels[si + 3];
+      }
+    }
+    /* Extrude: repeat the outermost row and column outward. Done after the
+       frame is in place so it copies what is actually there. */
+    for (let e = 1; e <= f.extrude; e++) {
+      for (let x = -e + 1; x < f.frame.w + e - 1; x++) {
+        const cx = Math.min(f.frame.w - 1, Math.max(0, x));
+        for (const [fromY, toY] of [[0, -e], [f.frame.h - 1, f.frame.h - 1 + e]]) {
+          const si = ((f.frame.y + fromY) * atlas.width + (f.frame.x + cx)) * 4;
+          const di = ((f.frame.y + toY) * atlas.width + (f.frame.x + x)) * 4;
+          if (di < 0 || di + 3 >= buf.length) continue;
+          buf[di] = buf[si]; buf[di + 1] = buf[si + 1];
+          buf[di + 2] = buf[si + 2]; buf[di + 3] = buf[si + 3];
+        }
+      }
+      for (let y = -e; y <= f.frame.h - 1 + e; y++) {
+        const cy = Math.min(f.frame.h - 1, Math.max(0, y));
+        for (const [fromX, toX] of [[0, -e], [f.frame.w - 1, f.frame.w - 1 + e]]) {
+          const si = ((f.frame.y + cy) * atlas.width + (f.frame.x + fromX)) * 4;
+          const di = ((f.frame.y + y) * atlas.width + (f.frame.x + toX)) * 4;
+          if (di < 0 || di + 3 >= buf.length) continue;
+          buf[di] = buf[si]; buf[di + 1] = buf[si + 1];
+          buf[di + 2] = buf[si + 2]; buf[di + 3] = buf[si + 3];
+        }
+      }
+    }
+  }
+  return buf;
+}
+
+/* ==== UI ==== */
+
+const $ = (id) => document.getElementById(id);
+const atlasCanvas = $('atlas');
+const actx = atlasCanvas.getContext('2d', { willReadFrequently: true });
+const previewCanvas = $('preview');
+const pctx = previewCanvas.getContext('2d');
+
+const state = {
+  source: 'files', padding: 2, extrude: 0, trim: true, powerOfTwo: false, square: false,
+  fps: 12, playing: true, checker: true, cellW: 32, cellH: 32,
+};
+
+let sources = [];
+let atlas = null;
+let frameImages = [];
+let hoverFrame = null;
+
+function options() {
+  return {
+    padding: state.padding, extrude: state.extrude, trim: state.trim,
+    powerOfTwo: state.powerOfTwo, square: state.square,
+  };
+}
+
+function rebuild() {
+  if (!sources.length) {
+    atlas = null;
+    $('stat-frames').textContent = '0';
+    $('stat-size').textContent = '—';
+    $('stat-fill').textContent = '—';
+    $('stat-trim').textContent = '—';
+    $('atlas-json').textContent = '';
+    actx.clearRect(0, 0, atlasCanvas.width, atlasCanvas.height);
+    return;
+  }
+  atlas = buildFrames(sources, options());
+  if (!atlas) {
+    $('atlas-note').textContent = 'These frames do not fit in an 8192×8192 atlas.';
+    return;
+  }
+  drawAtlas();
+  refreshStats();
+  refreshJson();
+  buildFrameImages();
+}
+
+function drawAtlas() {
+  atlasCanvas.width = atlas.width;
+  atlasCanvas.height = atlas.height;
+  const buf = blitAtlas(atlas);
+  const img = new ImageData(buf, atlas.width, atlas.height);
+  actx.putImageData(img, 0, 0);
+}
+
+function refreshStats() {
+  $('stat-frames').textContent = String(atlas.frames.length);
+  $('stat-size').textContent = `${atlas.width} × ${atlas.height}`;
+  $('stat-fill').textContent = `${(atlas.used * 100).toFixed(1)}%`;
+  let before = 0;
+  let after = 0;
+  for (const f of atlas.frames) {
+    before += f.sourceSize.w * f.sourceSize.h;
+    after += f.frame.w * f.frame.h;
+  }
+  $('stat-trim').textContent = before > 0 ? `${(100 - (after / before) * 100).toFixed(1)}%` : '—';
+}
+
+function refreshJson() {
+  $('atlas-json').textContent = atlasData(atlas, $('format-select').value, 'atlas.png');
+}
+
+/* Each frame as its own ImageData, for the animation preview. Reading them out
+   of the atlas rather than the sources is deliberate: if the packing or the
+   offsets are wrong, the preview shows it. */
+function buildFrameImages() {
+  const buf = blitAtlas(atlas);
+  frameImages = atlas.frames.map((f) => {
+    const out = new Uint8ClampedArray(f.sourceSize.w * f.sourceSize.h * 4);
+    for (let y = 0; y < f.frame.h; y++) {
+      for (let x = 0; x < f.frame.w; x++) {
+        const si = ((f.frame.y + y) * atlas.width + (f.frame.x + x)) * 4;
+        const dx = f.spriteSourceSize.x + x;
+        const dy = f.spriteSourceSize.y + y;
+        const di = (dy * f.sourceSize.w + dx) * 4;
+        out[di] = buf[si]; out[di + 1] = buf[si + 1];
+        out[di + 2] = buf[si + 2]; out[di + 3] = buf[si + 3];
+      }
+    }
+    return new ImageData(out, f.sourceSize.w, f.sourceSize.h);
+  });
+}
+
+/* ---- preview ---- */
+
+let previewIndex = 0;
+let lastAdvance = 0;
+
+function drawChecker(ctx, w, h) {
+  const size = 8;
+  for (let y = 0; y < h; y += size) {
+    for (let x = 0; x < w; x += size) {
+      ctx.fillStyle = ((x / size + y / size) % 2 === 0) ? '#0d1a16' : '#122520';
+      ctx.fillRect(x, y, size, size);
+    }
+  }
+}
+
+function drawPreview(now) {
+  const W = previewCanvas.width;
+  const H = previewCanvas.height;
+  if (state.checker) drawChecker(pctx, W, H);
+  else { pctx.fillStyle = '#04070a'; pctx.fillRect(0, 0, W, H); }
+
+  if (frameImages.length) {
+    if (state.playing && now - lastAdvance > 1000 / state.fps) {
+      previewIndex = (previewIndex + 1) % frameImages.length;
+      lastAdvance = now;
+    }
+    const img = frameImages[Math.min(previewIndex, frameImages.length - 1)];
+    const scale = Math.max(1, Math.floor(Math.min(W / img.width, H / img.height)));
+    /* Nearest-neighbour via a temp canvas, because putImageData ignores
+       transforms and drawImage of a scaled canvas smooths by default. */
+    const tmp = document.createElement('canvas');
+    tmp.width = img.width;
+    tmp.height = img.height;
+    tmp.getContext('2d').putImageData(img, 0, 0);
+    pctx.imageSmoothingEnabled = false;
+    pctx.drawImage(tmp, Math.floor((W - img.width * scale) / 2), Math.floor((H - img.height * scale) / 2),
+      img.width * scale, img.height * scale);
+  }
+  requestAnimationFrame(drawPreview);
+}
+
+/* ---- loading ---- */
+
+function imageToSource(name, img) {
+  const c = document.createElement('canvas');
+  c.width = img.width;
+  c.height = img.height;
+  const cx = c.getContext('2d', { willReadFrequently: true });
+  cx.drawImage(img, 0, 0);
+  const data = cx.getImageData(0, 0, img.width, img.height);
+  return { name, width: img.width, height: img.height, pixels: data.data };
+}
+
+function loadFiles(files) {
+  const list = Array.from(files).sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+  let pending = list.length;
+  if (!pending) return;
+  const loaded = new Array(list.length);
+  list.forEach((file, i) => {
+    const img = new Image();
+    img.onload = () => {
+      loaded[i] = imageToSource(file.name, img);
+      URL.revokeObjectURL(img.src);
+      if (--pending === 0) { sources = loaded.filter(Boolean); rebuild(); }
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(img.src);
+      if (--pending === 0) { sources = loaded.filter(Boolean); rebuild(); }
+    };
+    img.src = URL.createObjectURL(file);
+  });
+}
+
+function sliceSheet(file) {
+  const img = new Image();
+  img.onload = () => {
+    const c = document.createElement('canvas');
+    c.width = img.width;
+    c.height = img.height;
+    const cx = c.getContext('2d', { willReadFrequently: true });
+    cx.drawImage(img, 0, 0);
+    const cw = Math.max(1, state.cellW);
+    const ch = Math.max(1, state.cellH);
+    const cols = Math.floor(img.width / cw);
+    const rows = Math.floor(img.height / ch);
+    const out = [];
+    for (let r = 0; r < rows; r++) {
+      for (let col = 0; col < cols; col++) {
+        const data = cx.getImageData(col * cw, r * ch, cw, ch);
+        let any = false;
+        for (let i = 3; i < data.data.length; i += 4) if (data.data[i] > 0) { any = true; break; }
+        if (!any) continue;
+        out.push({
+          name: `cell_${String(r * cols + col).padStart(3, '0')}.png`,
+          width: cw, height: ch, pixels: data.data,
+        });
+      }
+    }
+    URL.revokeObjectURL(img.src);
+    $('slice-note').textContent = `${cols} × ${rows} cells of ${cw} × ${ch}; ${out.length} are not empty.`;
+    sources = out;
+    rebuild();
+  };
+  img.src = URL.createObjectURL(file);
+}
+
+/* ---- wiring ---- */
+
+$('source-bar').addEventListener('click', (ev) => {
+  const btn = ev.target.closest('.hud-tab');
+  if (!btn) return;
+  $('source-bar').querySelectorAll('.hud-tab').forEach((b) => b.classList.remove('active'));
+  btn.classList.add('active');
+  state.source = btn.dataset.source;
+  $('files-panel').classList.toggle('hidden', state.source !== 'files');
+  $('slice-panel').classList.toggle('hidden', state.source !== 'slice');
+  if (state.source === 'demo') { sources = demoFrames(); rebuild(); }
+});
+
+$('file-input').addEventListener('change', (ev) => loadFiles(ev.target.files));
+$('sheet-input').addEventListener('change', (ev) => { if (ev.target.files[0]) sliceSheet(ev.target.files[0]); });
+
+const drop = $('drop-zone');
+for (const type of ['dragenter', 'dragover']) {
+  drop.addEventListener(type, (ev) => { ev.preventDefault(); drop.classList.add('ssp-drop-active'); });
+}
+for (const type of ['dragleave', 'drop']) {
+  drop.addEventListener(type, (ev) => { ev.preventDefault(); drop.classList.remove('ssp-drop-active'); });
+}
+drop.addEventListener('drop', (ev) => { if (ev.dataTransfer.files.length) loadFiles(ev.dataTransfer.files); });
+
+const SLIDERS = [
+  ['pad-slider', 'pad-value', 'padding'],
+  ['extrude-slider', 'extrude-value', 'extrude'],
+  ['fps-slider', 'fps-value', 'fps'],
+];
+for (const [slider, label, key] of SLIDERS) {
+  $(slider).addEventListener('input', () => {
+    state[key] = Number($(slider).value);
+    $(label).textContent = String(state[key]);
+    if (key !== 'fps') rebuild();
+  });
+}
+for (const [id, key] of [['trim-check', 'trim'], ['pot-check', 'powerOfTwo'], ['square-check', 'square']]) {
+  $(id).addEventListener('change', () => { state[key] = $(id).checked; rebuild(); });
+}
+for (const id of ['cell-w', 'cell-h']) {
+  $(id).addEventListener('input', () => {
+    state.cellW = Math.max(1, Number($('cell-w').value) || 1);
+    state.cellH = Math.max(1, Number($('cell-h').value) || 1);
+  });
+}
+$('format-select').addEventListener('change', () => { if (atlas) refreshJson(); });
+
+$('playpause-btn').addEventListener('click', () => {
+  state.playing = !state.playing;
+  $('playpause-btn').textContent = state.playing ? 'Pause' : 'Play';
+  $('playpause-btn').setAttribute('aria-pressed', String(state.playing));
+});
+$('bg-btn').addEventListener('click', () => {
+  state.checker = !state.checker;
+  $('bg-btn').textContent = `Background: ${state.checker ? 'checker' : 'dark'}`;
+});
+
+atlasCanvas.addEventListener('pointermove', (ev) => {
+  if (!atlas) return;
+  const rect = atlasCanvas.getBoundingClientRect();
+  const x = ((ev.clientX - rect.left) / rect.width) * atlas.width;
+  const y = ((ev.clientY - rect.top) / rect.height) * atlas.height;
+  hoverFrame = atlas.frames.find((f) => x >= f.frame.x && y >= f.frame.y
+    && x < f.frame.x + f.frame.w && y < f.frame.y + f.frame.h) || null;
+  $('atlas-note').textContent = hoverFrame
+    ? `${hoverFrame.name} — atlas rect ${hoverFrame.frame.x}, ${hoverFrame.frame.y}, ${hoverFrame.frame.w} × ${hoverFrame.frame.h}; drawn at offset ${hoverFrame.spriteSourceSize.x}, ${hoverFrame.spriteSourceSize.y} inside a ${hoverFrame.sourceSize.w} × ${hoverFrame.sourceSize.h} sprite`
+    : 'Hover a frame to see its rectangle.';
+});
+atlasCanvas.addEventListener('pointerleave', () => {
+  hoverFrame = null;
+  $('atlas-note').textContent = 'Hover a frame to see its rectangle.';
+});
+
+function download(name, blob) {
+  const link = $('download-link');
+  const url = URL.createObjectURL(blob);
+  link.href = url;
+  link.download = name;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+
+$('png-btn').addEventListener('click', () => {
+  if (!atlas) return;
+  atlasCanvas.toBlob((blob) => { if (blob) download('atlas.png', blob); }, 'image/png');
+});
+
+$('json-btn').addEventListener('click', () => {
+  if (!atlas) return;
+  const format = $('format-select').value;
+  const ext = format === 'css' ? 'css' : format === 'godot' ? 'tres' : 'json';
+  download(`atlas.${ext}`, new Blob([$('atlas-json').textContent], { type: 'text/plain' }));
+});
+
+$('gif-btn').addEventListener('click', () => {
+  if (!frameImages.length || !window.GifEncoder) return;
+  $('gif-status').textContent = 'Encoding…';
+  /* Give the status line a frame to paint before the encoder blocks. */
+  setTimeout(() => {
+    const w = Math.max(...frameImages.map((f) => f.width));
+    const h = Math.max(...frameImages.map((f) => f.height));
+    const delay = Math.max(2, Math.round(100 / state.fps));
+    const frames = frameImages.map((img) => {
+      /* GIF has one-bit transparency and no alpha; composite onto a flat
+         background so semi-transparent edges do not turn into a halo. */
+      const rgba = new Uint8ClampedArray(w * h * 4);
+      for (let i = 0; i < rgba.length; i += 4) {
+        rgba[i] = 10; rgba[i + 1] = 20; rgba[i + 2] = 16; rgba[i + 3] = 255;
+      }
+      const offX = Math.floor((w - img.width) / 2);
+      const offY = Math.floor((h - img.height) / 2);
+      for (let y = 0; y < img.height; y++) {
+        for (let x = 0; x < img.width; x++) {
+          const si = (y * img.width + x) * 4;
+          const a = img.data[si + 3] / 255;
+          if (a === 0) continue;
+          const di = ((y + offY) * w + (x + offX)) * 4;
+          rgba[di] = Math.round(img.data[si] * a + rgba[di] * (1 - a));
+          rgba[di + 1] = Math.round(img.data[si + 1] * a + rgba[di + 1] * (1 - a));
+          rgba[di + 2] = Math.round(img.data[si + 2] * a + rgba[di + 2] * (1 - a));
+        }
+      }
+      return { rgba, delay };
+    });
+    const bytes = window.GifEncoder.encodeGif(w, h, frames, { maxColors: 256 });
+    download('animation.gif', new Blob([bytes], { type: 'image/gif' }));
+    $('gif-status').textContent = `Wrote a ${w} × ${h} GIF of ${frames.length} frames at ${state.fps} fps.`;
+  }, 30);
+});
+
+function toast(msg) {
+  const el = $('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 1400);
+}
+$('copy-btn').addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText($('atlas-json').textContent);
+    toast('Copied');
+  } catch (err) { toast('Clipboard blocked'); }
+});
+
+window.__packer = {
+  trimBounds, packRects, packIntoBin, buildFrames, atlasData, blitAtlas, demoFrames,
+  splitFreeRect, pruneFreeList,
+  set(opts) { Object.assign(state, opts); rebuild(); return atlas; },
+  loadDemo(count, size) { sources = demoFrames(count, size); rebuild(); return atlas; },
+  get atlas() { return atlas; },
+  /* The round trip that matters: blit every frame into the atlas, read each one
+     back out through the rectangles the export publishes, and compare with the
+     source pixel for pixel. A wrong trim offset or an off-by-one in the padding
+     cannot survive this. */
+  roundTrip() {
+    if (!atlas) return null;
+    const buf = blitAtlas(atlas);
+    let worst = 0;
+    let compared = 0;
+    for (const f of atlas.frames) {
+      for (let y = 0; y < f.frame.h; y++) {
+        for (let x = 0; x < f.frame.w; x++) {
+          const si = ((f.frame.y + y) * atlas.width + (f.frame.x + x)) * 4;
+          const sx = f.spriteSourceSize.x + x;
+          const sy = f.spriteSourceSize.y + y;
+          const oi = (sy * f.source.width + sx) * 4;
+          for (let c = 0; c < 4; c++) {
+            worst = Math.max(worst, Math.abs(buf[si + c] - f.source.pixels[oi + c]));
+            compared++;
+          }
+        }
+      }
+    }
+    return { worst, compared, exact: worst === 0 };
+  },
+};
+
+/* ---- boot ---- */
+sources = demoFrames();
+rebuild();
+requestAnimationFrame(drawPreview);
+</script>
+<!-- Slippy Deck: floating Slippy TV + jukebox player. Renders nothing unless admin.slippylabs.com/whoami confirms a signed-in account. -->
+<script defer src="https://slippylabs.com/deck/deck.js"></script>
+<!-- Slippy Labs sitewide privacy link. Self-contained on purpose: these sites
+     share no CSS, so it carries its own styles and inherits the page's text
+     colour instead of assuming a palette. position/z-index are load bearing --
+     the HUD theme's .starfield/.scanlines are fixed at z-index 0-1 and would
+     paint straight over an unpositioned footer.
+     The .page-wrap trim below is what keeps the bar on the first screen. -->
+<div class="sl-legal"><a href="https://slippylabs.com/privacy.html">Privacy</a></div>
+<style>
+.sl-legal{box-sizing:border-box;position:relative;z-index:3;height:64px;display:flex;align-items:center;justify-content:center;margin:0;padding:0 12px;font-family:"Consolas","SFMono-Regular",Menlo,Monaco,"Courier New",monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;opacity:.5}
+.sl-legal a{color:inherit;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:0 14px}
+.sl-legal a:hover,.sl-legal a:focus-visible{text-decoration:underline;opacity:1}
+/* This page centres .page-wrap at min-height:100vh, which would push the bar a
+   whole screen below the fold. Give back exactly the bar height instead of
+   adding a scrollbar to a page that had none. */
+.page-wrap{min-height:calc(100vh - 64px)}
+</style>
+</body>
+</html>
